@@ -1,0 +1,35 @@
+[package]
+name = "karlsruhe-garbage-calendar"
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.70"
+
+[dependencies.anyhow]
+version = "^1.0"
+
+[dependencies.axum]
+version = "^0.6"
+
+[dependencies.chrono]
+version = "^0.4"
+
+[dependencies.dav-server]
+version = "^0.5"
+
+[dependencies.ical]
+version = "^0.8"
+default-features = false
+features = ["ical", "generator"]
+
+[dependencies.regex]
+version = "^1.8"
+
+[dependencies.reqwest]
+version = "^0.11"
+
+[dependencies.scraper]
+version = "^0.16"
+
+[dependencies.tokio]
+version = "^1.28"
+features = ["full"]
