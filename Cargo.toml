@@ -1,6 +1,6 @@
 [package]
 name = "karlsruhe-garbage-calendar"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.70"
 
@@ -12,9 +12,6 @@ version = "^0.6"
 
 [dependencies.chrono]
 version = "^0.4"
-
-[dependencies.dav-server]
-version = "^0.5"
 
 [dependencies.ical]
 version = "^0.8"
