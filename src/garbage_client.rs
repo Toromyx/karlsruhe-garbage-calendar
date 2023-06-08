@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
+use bitmask_enum::bitmask;
 use chrono::NaiveDate;
 use ical::{
     generator::{IcalCalendar, IcalCalendarBuilder, IcalEvent, IcalEventBuilder, Property},
@@ -15,8 +16,21 @@ static PROD_ID: &str = "-//Abfuhrkalender//karlsruhe.de";
 static TIMEZONE: &str = "Europe/Berlin";
 static FORMAT: &str = "%Y%m%d";
 
+#[bitmask]
+pub enum ExcludeWasteType {
+    Residual,
+    Organic,
+    Recyclable,
+    Paper,
+    Bulky,
+}
+
 /// Get the calendar for a specific street and street number.
-pub async fn get(street: &str, street_number: &str) -> Result<IcalCalendar> {
+pub async fn get(
+    street: &str,
+    street_number: &str,
+    exclude_waste_type: ExcludeWasteType,
+) -> Result<IcalCalendar> {
     let client = reqwest::Client::new();
     let response = client
         .post("https://web6.karlsruhe.de/service/abfall/akal/akal.php")
@@ -54,21 +68,36 @@ pub async fn get(street: &str, street_number: &str) -> Result<IcalCalendar> {
                 .build(),
         )
     };
-    if let Some(event) = build_event(waste_data.residual_waste, "Restmüll") {
+    if let (Some(event), false) = (
+        build_event(waste_data.residual_waste, "Restmüll"),
+        exclude_waste_type.contains(ExcludeWasteType::Residual),
+    ) {
         calendar.events.push(event);
     }
-    if let Some(event) = build_event(waste_data.organic_waste, "Bioabfall") {
+    if let (Some(event), false) = (
+        build_event(waste_data.organic_waste, "Bioabfall"),
+        exclude_waste_type.contains(ExcludeWasteType::Organic),
+    ) {
         calendar.events.push(event);
     }
-    if let Some(event) = build_event(waste_data.recyclable_waste, "Wertstoff") {
+    if let (Some(event), false) = (
+        build_event(waste_data.recyclable_waste, "Wertstoff"),
+        exclude_waste_type.contains(ExcludeWasteType::Recyclable),
+    ) {
         calendar.events.push(event);
     }
-    if let Some(event) = build_event(waste_data.paper_waste, "Papier") {
+    if let (Some(event), false) = (
+        build_event(waste_data.paper_waste, "Papier"),
+        exclude_waste_type.contains(ExcludeWasteType::Paper),
+    ) {
         calendar.events.push(event);
     }
-    if let Some(event) = build_event(
-        waste_data.bulky_waste.into_iter().collect(),
-        "Sperrmüllabholung",
+    if let (Some(event), false) = (
+        build_event(
+            waste_data.bulky_waste.into_iter().collect(),
+            "Sperrmüllabholung",
+        ),
+        exclude_waste_type.contains(ExcludeWasteType::Bulky),
     ) {
         calendar.events.push(event);
     }
@@ -198,14 +227,16 @@ struct WasteData {
 mod tests {
     use chrono::NaiveDate;
 
-    use crate::garbage_client::{get, parse, WasteData};
+    use crate::garbage_client::{get, parse, ExcludeWasteType, WasteData};
 
     /// Test whether requests can be sent and the resulting calendar contains something.
     ///
     /// This is an online test!
     #[tokio::test]
     async fn test_get() {
-        let calendar = get("Schloßplatz", "1").await.unwrap();
+        let calendar = get("Schloßplatz", "1", ExcludeWasteType::none())
+            .await
+            .unwrap();
         assert!(calendar.events.len() > 0);
     }
 

@@ -1,6 +1,6 @@
 [package]
 name = "karlsruhe-garbage-calendar"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 rust-version = "1.70"
 
@@ -9,6 +9,9 @@ version = "^1.0"
 
 [dependencies.axum]
 version = "^0.6"
+
+[dependencies.bitmask-enum]
+version = "^2.1"
 
 [dependencies.chrono]
 version = "^0.4"
