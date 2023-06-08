@@ -10,11 +10,18 @@ use ical::{
     ical_param, ical_property,
 };
 use regex::{Captures, Regex};
+use reqwest::Response;
 use scraper::{Html, Selector};
 
 static PROD_ID: &str = "-//Abfuhrkalender//karlsruhe.de";
 static TIMEZONE: &str = "Europe/Berlin";
 static FORMAT: &str = "%Y%m%d";
+
+static LABEL_RESIDUAL: &str = "Restmüll";
+static LABEL_ORGANIC: &str = "Bioabfall";
+static LABEL_RECYCLABLE: &str = "Wertstoff";
+static LABEL_PAPER: &str = "Papier";
+static LABEL_BULKY: &str = "Sperrmüllabholung";
 
 #[bitmask]
 pub enum ExcludeWasteType {
@@ -31,6 +38,13 @@ pub async fn get(
     street_number: &str,
     exclude_waste_type: ExcludeWasteType,
 ) -> Result<IcalCalendar> {
+    let response = get_response(street, street_number).await?;
+    let waste_data = parse(&response.text().await?)?;
+    let calendar = get_calendar(street, street_number, waste_data, exclude_waste_type);
+    Ok(calendar)
+}
+
+async fn get_response(street: &str, street_number: &str) -> Result<Response> {
     let client = reqwest::Client::new();
     let response = client
         .post("https://web6.karlsruhe.de/service/abfall/akal/akal.php")
@@ -40,7 +54,15 @@ pub async fn get(
         ]))
         .send()
         .await?;
-    let waste_data = parse(&response.text().await?)?;
+    Ok(response)
+}
+
+fn get_calendar(
+    street: &str,
+    street_number: &str,
+    waste_data: WasteData,
+    exclude_waste_type: ExcludeWasteType,
+) -> IcalCalendar {
     let changed = chrono::Local::now().format(FORMAT).to_string();
     let mut calendar = IcalCalendarBuilder::version("2.0")
         .gregorian()
@@ -69,39 +91,36 @@ pub async fn get(
         )
     };
     if let (Some(event), false) = (
-        build_event(waste_data.residual_waste, "Restmüll"),
+        build_event(waste_data.residual_waste, LABEL_RESIDUAL),
         exclude_waste_type.contains(ExcludeWasteType::Residual),
     ) {
         calendar.events.push(event);
     }
     if let (Some(event), false) = (
-        build_event(waste_data.organic_waste, "Bioabfall"),
+        build_event(waste_data.organic_waste, LABEL_ORGANIC),
         exclude_waste_type.contains(ExcludeWasteType::Organic),
     ) {
         calendar.events.push(event);
     }
     if let (Some(event), false) = (
-        build_event(waste_data.recyclable_waste, "Wertstoff"),
+        build_event(waste_data.recyclable_waste, LABEL_RECYCLABLE),
         exclude_waste_type.contains(ExcludeWasteType::Recyclable),
     ) {
         calendar.events.push(event);
     }
     if let (Some(event), false) = (
-        build_event(waste_data.paper_waste, "Papier"),
+        build_event(waste_data.paper_waste, LABEL_PAPER),
         exclude_waste_type.contains(ExcludeWasteType::Paper),
     ) {
         calendar.events.push(event);
     }
     if let (Some(event), false) = (
-        build_event(
-            waste_data.bulky_waste.into_iter().collect(),
-            "Sperrmüllabholung",
-        ),
+        build_event(waste_data.bulky_waste.into_iter().collect(), LABEL_BULKY),
         exclude_waste_type.contains(ExcludeWasteType::Bulky),
     ) {
         calendar.events.push(event);
     }
-    Ok(calendar)
+    calendar
 }
 
 /// Parse the garbage HTML to usable waste data.
@@ -151,37 +170,37 @@ fn parse(html: &str) -> Result<WasteData> {
         };
         let type_col_inner_html = type_col.inner_html();
         match () {
-            _ if type_col_inner_html.contains("Restmüll") => {
+            _ if type_col_inner_html.contains(LABEL_RESIDUAL) => {
                 let Some(date_col) = row_element.select(&date_col_selector).next() else {
                     break;
                 };
                 let date_col_inner_html = date_col.inner_html();
                 residual_waste_dates = find_dates(&date_col_inner_html);
             }
-            _ if type_col_inner_html.contains("Bioabfall") => {
+            _ if type_col_inner_html.contains(LABEL_ORGANIC) => {
                 let Some(date_col) = row_element.select(&date_col_selector).next() else {
                     break;
                 };
                 let date_col_inner_html = date_col.inner_html();
                 organic_waste_dates = find_dates(&date_col_inner_html);
             }
-            _ if type_col_inner_html.contains("Wertstoff") => {
+            _ if type_col_inner_html.contains(LABEL_RECYCLABLE) => {
                 let Some(date_col) = row_element.select(&date_col_selector).next() else {
                     break;
                 };
                 let date_col_inner_html = date_col.inner_html();
                 recyclable_waste_dates = find_dates(&date_col_inner_html);
             }
-            _ if type_col_inner_html.contains("Papier") => {
+            _ if type_col_inner_html.contains(LABEL_PAPER) => {
                 let Some(date_col) = row_element.select(&date_col_selector).next() else {
                     break;
                 };
                 let date_col_inner_html = date_col.inner_html();
                 paper_waste_dates = find_dates(&date_col_inner_html);
             }
-            _ if type_col_inner_html.contains("Sperrmüllabholung") => {
+            _ if type_col_inner_html.contains(LABEL_BULKY) => {
                 let Some(date_col) = row_element.select(&bulky_waste_date_col_selector).next() else {
-                  break;
+                    break;
                 };
                 bulky_waste_date = bulky_waste_date_regex
                     .captures(&date_col.inner_html())
@@ -226,28 +245,15 @@ struct WasteData {
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDate;
+    use ical::generator::{IcalCalendar, IcalEvent};
 
-    use crate::garbage_client::{get, parse, ExcludeWasteType, WasteData};
+    use crate::garbage_client::{
+        get, get_calendar, parse, ExcludeWasteType, WasteData, LABEL_BULKY, LABEL_ORGANIC,
+        LABEL_RECYCLABLE, LABEL_RESIDUAL,
+    };
 
-    /// Test whether requests can be sent and the resulting calendar contains something.
-    ///
-    /// This is an online test!
-    #[tokio::test]
-    async fn test_get() {
-        let calendar = get("Schloßplatz", "1", ExcludeWasteType::none())
-            .await
-            .unwrap();
-        assert!(calendar.events.len() > 0);
-    }
-
-    /// Test whether the HTML is parsed correctly.
-    ///
-    /// This test is offline.
-    #[test]
-    fn test_parse() {
-        let html = include_str!("garbage_client/tests/response.html");
-        let parsed = parse(html).unwrap();
-        let expected = WasteData {
+    fn get_test_waste_data() -> WasteData {
+        WasteData {
             residual_waste: vec![
                 NaiveDate::from_ymd_opt(2023, 6, 16).unwrap(),
                 NaiveDate::from_ymd_opt(2023, 6, 29).unwrap(),
@@ -269,7 +275,93 @@ mod tests {
                 NaiveDate::from_ymd_opt(2023, 8, 9).unwrap(),
             ],
             bulky_waste: Some(NaiveDate::from_ymd_opt(2023, 7, 12).unwrap()),
-        };
+        }
+    }
+
+    /// Test whether requests can be sent and the resulting calendar contains something.
+    ///
+    /// This is an online test!
+    #[tokio::test]
+    async fn test_get() {
+        let calendar = get("Schloßplatz", "1", ExcludeWasteType::none())
+            .await
+            .unwrap();
+        assert!(calendar.events.len() > 0);
+    }
+
+    fn find_event<'a>(calendar: &'a IcalCalendar, summary: &str) -> Option<&'a IcalEvent> {
+        calendar.events.iter().find(|event| {
+            event
+                .properties
+                .iter()
+                .find(|property| {
+                    property.name == String::from("SUMMARY")
+                        && property
+                            .value
+                            .as_ref()
+                            .is_some_and(|value| value == summary)
+                })
+                .is_some()
+        })
+    }
+
+    fn get_property_value_of_event<'a>(
+        calendar: &'a IcalCalendar,
+        property_name: &str,
+        summary: &str,
+    ) -> &'a str {
+        find_event(calendar, summary)
+            .unwrap()
+            .properties
+            .iter()
+            .find(|property| property.name == String::from(property_name))
+            .unwrap()
+            .value
+            .as_ref()
+            .unwrap()
+    }
+
+    #[test]
+    fn test_get_calendar_all() {
+        let waste_data = get_test_waste_data();
+        let calendar = get_calendar("street", "69", waste_data, ExcludeWasteType::none());
+        assert_eq!(calendar.events.len(), 5);
+        let residual_dtstart = get_property_value_of_event(&calendar, "DTSTART", LABEL_RESIDUAL);
+        assert_eq!(residual_dtstart, "20230616");
+        let recyclable_rdate = get_property_value_of_event(&calendar, "RDATE", LABEL_RECYCLABLE);
+        assert_eq!(recyclable_rdate, "20230607,20230622,20230706");
+    }
+
+    #[test]
+    fn test_get_calendar_exclusion() {
+        let waste_data = get_test_waste_data();
+        let calendar = get_calendar("street", "69", waste_data, ExcludeWasteType::Bulky);
+        assert_eq!(calendar.events.len(), 4);
+        let bulky_found = find_event(&calendar, LABEL_BULKY).is_some();
+        assert_eq!(bulky_found, false);
+
+        let waste_data = get_test_waste_data();
+        let calendar = get_calendar(
+            "street",
+            "69",
+            waste_data,
+            ExcludeWasteType::Recyclable | ExcludeWasteType::Organic,
+        );
+        assert_eq!(calendar.events.len(), 3);
+        let recyclable_found = find_event(&calendar, LABEL_RECYCLABLE).is_some();
+        assert_eq!(recyclable_found, false);
+        let organic_found = find_event(&calendar, LABEL_ORGANIC).is_some();
+        assert_eq!(organic_found, false);
+    }
+
+    /// Test whether the HTML is parsed correctly.
+    ///
+    /// This test is offline.
+    #[test]
+    fn test_parse() {
+        let html = include_str!("garbage_client/tests/response.html");
+        let parsed = parse(html).unwrap();
+        let expected = get_test_waste_data();
         assert_eq!(parsed, expected)
     }
 }
