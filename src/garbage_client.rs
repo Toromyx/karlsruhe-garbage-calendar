@@ -13,6 +13,7 @@ use regex::{Captures, Regex};
 use reqwest::Response;
 use scraper::{Html, Selector};
 
+static URL: &str = "https://web6.karlsruhe.de/service/abfall/akal/akal.php";
 static PROD_ID: &str = "-//Abfuhrkalender//karlsruhe.de";
 static TIMEZONE: &str = "Europe/Berlin";
 static FORMAT: &str = "%Y%m%d";
@@ -47,7 +48,7 @@ pub async fn get(
 async fn get_response(street: &str, street_number: &str) -> Result<Response> {
     let client = reqwest::Client::new();
     let response = client
-        .post("https://web6.karlsruhe.de/service/abfall/akal/akal.php")
+        .post(URL)
         .form(&HashMap::from([
             ("strasse_n", street),
             ("hausnr", street_number),
@@ -91,6 +92,7 @@ fn get_calendar(
                     "LOCATION",
                     format!("{street} {street_number}, Karlsruhe")
                 ))
+                .set(ical_property!("DESCRIPTION", URL))
                 .build(),
         )
     };
