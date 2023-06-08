@@ -87,6 +87,10 @@ fn get_calendar(
                         .join(","),
                     ical_param!("VALUE", "DATE")
                 ))
+                .set(ical_property!(
+                    "LOCATION",
+                    format!("{street} {street_number}, Karlsruhe")
+                ))
                 .build(),
         )
     };
