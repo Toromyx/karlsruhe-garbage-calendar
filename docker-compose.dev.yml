@@ -1,0 +1,11 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: .docker/dev.dockerfile
+    working_dir: /opt/project
+    tty: true
+    ports:
+      - "8008"
+    volumes:
+      - .:/opt/project
