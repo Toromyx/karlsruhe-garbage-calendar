@@ -144,7 +144,7 @@ fn parse(html: &str) -> Result<WasteData> {
     let bulky_waste_date_col_selector = Selector::parse(".col_4-3").unwrap();
     let date_regex = Regex::new(
         r"(?x)
-            >\s* # the ending of the previous closing tag
+            >\s* # the ending of the previous tag
             \w{2}\.\s # the day of the week in short notation with a dot and a space
             den\s
             (?P<day>\d{2}) # the day
@@ -156,7 +156,7 @@ fn parse(html: &str) -> Result<WasteData> {
     )
     .unwrap();
     let bulky_waste_date_regex =
-        Regex::new(r"(?P<day>\d{2})\.(?P<month>\d{2})\.(?P<year>\d{4})").unwrap();
+        Regex::new(r">\s*(?P<day>\d{2})\.(?P<month>\d{2})\.(?P<year>\d{4})").unwrap();
     let date_from_captures = |captures: Captures| -> Option<NaiveDate> {
         let day: u32 = captures["day"].parse().unwrap();
         let month: u32 = captures["month"].parse().unwrap();
