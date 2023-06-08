@@ -3,6 +3,7 @@ name = "karlsruhe-garbage-calendar"
 version = "0.2.2"
 edition = "2021"
 rust-version = "1.70"
+license = "MIT"
 
 [dependencies.anyhow]
 version = "^1.0"
