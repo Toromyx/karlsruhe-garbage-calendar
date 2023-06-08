@@ -83,3 +83,61 @@ async fn handler(
     let response = ([(CONTENT_TYPE, "text/calendar")], ical_calendar.generate()).into_response();
     Ok(response)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{garbage_client::ExcludeWasteType, QueryParams};
+
+    #[test]
+    fn test_from_query_params_for_exclude_waste_type() {
+        let exclude_query_params = QueryParams {
+            street: "".to_string(),
+            street_number: "".to_string(),
+            exclude_residual: false,
+            exclude_organic: false,
+            exclude_recyclable: false,
+            exclude_paper: false,
+            exclude_bulky: false,
+        };
+        let exclude_from_query_params = ExcludeWasteType::from(&exclude_query_params);
+        assert_eq!(exclude_from_query_params, ExcludeWasteType::none());
+        let exclude_query_params = QueryParams {
+            street: "".to_string(),
+            street_number: "".to_string(),
+            exclude_residual: true,
+            exclude_organic: false,
+            exclude_recyclable: false,
+            exclude_paper: false,
+            exclude_bulky: false,
+        };
+        let exclude_from_query_params = ExcludeWasteType::from(&exclude_query_params);
+        assert_eq!(exclude_from_query_params, ExcludeWasteType::Residual);
+        let exclude_query_params = QueryParams {
+            street: "".to_string(),
+            street_number: "".to_string(),
+            exclude_residual: false,
+            exclude_organic: true,
+            exclude_recyclable: false,
+            exclude_paper: false,
+            exclude_bulky: false,
+        };
+        let exclude_from_query_params = ExcludeWasteType::from(&exclude_query_params);
+        assert_eq!(exclude_from_query_params, ExcludeWasteType::Organic);
+        let exclude_query_params = QueryParams {
+            street: "".to_string(),
+            street_number: "".to_string(),
+            exclude_residual: false,
+            exclude_organic: false,
+            exclude_recyclable: true,
+            exclude_paper: true,
+            exclude_bulky: true,
+        };
+        let exclude_from_query_params = ExcludeWasteType::from(&exclude_query_params);
+        assert_eq!(
+            exclude_from_query_params,
+            ExcludeWasteType::Recyclable
+                .or(ExcludeWasteType::Paper)
+                .or(ExcludeWasteType::Bulky)
+        );
+    }
+}
