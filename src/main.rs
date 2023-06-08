@@ -11,7 +11,7 @@ use axum::{
     extract::Query,
     http::{header::CONTENT_TYPE, StatusCode},
     response::{IntoResponse, Response},
-    routing::any,
+    routing::get,
     Router,
 };
 use ical::generator::Emitter;
@@ -21,7 +21,7 @@ use crate::garbage_client::ExcludeWasteType;
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new().route("/calendar", any(handler));
+    let app = Router::new().route("/calendar", get(handler));
     let addr = SocketAddr::from(([0, 0, 0, 0], 8008));
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
