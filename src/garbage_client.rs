@@ -63,7 +63,7 @@ fn get_calendar(
     waste_data: WasteData,
     exclude_waste_type: ExcludeWasteType,
 ) -> IcalCalendar {
-    let changed = chrono::Local::now().format(FORMAT).to_string();
+    let changed = chrono::Local::now().format("%Y%m%dT%H%M%S").to_string();
     let mut calendar = IcalCalendarBuilder::version("2.0")
         .gregorian()
         .prodid(PROD_ID)
