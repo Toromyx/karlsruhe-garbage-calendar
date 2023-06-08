@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use anyhow::Result;
 use chrono::NaiveDate;
 use ical::{
-    generator::{IcalCalendar, IcalCalendarBuilder, IcalEventBuilder, Property},
-    ical_property,
+    generator::{IcalCalendar, IcalCalendarBuilder, IcalEvent, IcalEventBuilder, Property},
+    ical_param, ical_property,
 };
 use regex::{Captures, Regex};
 use scraper::{Html, Selector};
@@ -32,28 +32,45 @@ pub async fn get(street: &str, street_number: &str) -> Result<IcalCalendar> {
         .gregorian()
         .prodid(PROD_ID)
         .build();
-    let build_event = |date: NaiveDate, summary: &str| {
-        IcalEventBuilder::tzid(TIMEZONE)
-            .uid(uid(street, street_number, summary, &date))
-            .changed(&changed)
-            .one_day(date.format(FORMAT).to_string())
-            .set(ical_property!("SUMMARY", summary))
-            .build()
+    let build_event = |dates: Vec<NaiveDate>, summary: &str| -> Option<IcalEvent> {
+        if dates.len() == 0 {
+            return None;
+        }
+        Some(
+            IcalEventBuilder::tzid(TIMEZONE)
+                .uid(uid(street, street_number, summary))
+                .changed(&changed)
+                .one_day(dates.get(0).unwrap().format(FORMAT).to_string())
+                .set(ical_property!("SUMMARY", summary))
+                .set(ical_property!(
+                    "RDATE",
+                    dates
+                        .into_iter()
+                        .map(|date| date.format(FORMAT).to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                    ical_param!("VALUE", "DATE")
+                ))
+                .build(),
+        )
     };
-    for date in waste_data.residual_waste {
-        calendar.events.push(build_event(date, "Restmüll"));
+    if let Some(event) = build_event(waste_data.residual_waste, "Restmüll") {
+        calendar.events.push(event);
     }
-    for date in waste_data.organic_waste {
-        calendar.events.push(build_event(date, "Bioabfall"));
+    if let Some(event) = build_event(waste_data.organic_waste, "Bioabfall") {
+        calendar.events.push(event);
     }
-    for date in waste_data.recyclable_waste {
-        calendar.events.push(build_event(date, "Wertstoff"));
+    if let Some(event) = build_event(waste_data.recyclable_waste, "Wertstoff") {
+        calendar.events.push(event);
     }
-    for date in waste_data.paper_waste {
-        calendar.events.push(build_event(date, "Papier"));
+    if let Some(event) = build_event(waste_data.paper_waste, "Papier") {
+        calendar.events.push(event);
     }
-    if let Some(date) = waste_data.bulky_waste {
-        calendar.events.push(build_event(date, "Sperrmüllabholung"));
+    if let Some(event) = build_event(
+        waste_data.bulky_waste.into_iter().collect(),
+        "Sperrmüllabholung",
+    ) {
+        calendar.events.push(event);
     }
     Ok(calendar)
 }
@@ -155,11 +172,16 @@ fn parse(html: &str) -> Result<WasteData> {
     Ok(waste_data)
 }
 
-/// Get a unique id for a specific waste collection date at a specific location.
+/// Get a unique id for a specific waste collection type at a specific location.
 ///
 /// Changing this function is a breaking change!  
-fn uid(street: &str, street_number: &str, summary: &str, date: &NaiveDate) -> String {
-    format!("{} {} {} {}", street, street_number, summary, date)
+fn uid(street: &str, street_number: &str, summary: &str) -> String {
+    let whitespace_regex = Regex::new(r"\s+").unwrap();
+    let whitespace_rep = "-";
+    let street = whitespace_regex.replace_all(street, whitespace_rep);
+    let street_number = whitespace_regex.replace_all(street_number, whitespace_rep);
+    let summary = whitespace_regex.replace_all(summary, whitespace_rep);
+    format!("Abfuhrkalender_{street}_{street_number}_{summary}@karlsruhe.de")
 }
 
 /// This is the data which can be extracted from the official website.
