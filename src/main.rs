@@ -44,7 +44,7 @@ async fn handler(
     let street_number = params.get("street_number").unwrap();
     let ical_calendar = garbage_client::get(&street, &street_number).await.unwrap();
     let mem_fs = MemFs::new();
-    let calendar_dav_path = DavPath::new("/calendar").unwrap();
+    let calendar_dav_path = DavPath::new(request.uri().path()).unwrap();
     let mut dav_file = mem_fs
         .open(
             &calendar_dav_path,
