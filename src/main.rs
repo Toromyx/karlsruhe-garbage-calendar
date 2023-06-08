@@ -5,7 +5,7 @@
 
 mod garbage_client;
 
-use std::{collections::HashMap, net::SocketAddr};
+use std::net::SocketAddr;
 
 use axum::{
     extract::Query,
@@ -15,6 +15,7 @@ use axum::{
     Router,
 };
 use ical::generator::Emitter;
+use serde::Deserialize;
 
 #[tokio::main]
 async fn main() {
@@ -26,15 +27,19 @@ async fn main() {
         .unwrap();
 }
 
+#[derive(Debug, Clone, Deserialize)]
+struct QueryParams {
+    street: String,
+    street_number: String,
+}
+
 /// Handle calendar requests.
 ///
 /// The `street` and `street_number` must be given in the query string.
 async fn handler(
-    Query(params): Query<HashMap<String, String>>,
+    Query(query_params): Query<QueryParams>,
 ) -> Result<Response, (StatusCode, String)> {
-    let street = params.get("street").unwrap();
-    let street_number = params.get("street_number").unwrap();
-    let ical_calendar = garbage_client::get(&street, &street_number)
+    let ical_calendar = garbage_client::get(&query_params.street, &query_params.street_number)
         .await
         .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
     let response = ([(CONTENT_TYPE, "text/calendar")], ical_calendar.generate()).into_response();
