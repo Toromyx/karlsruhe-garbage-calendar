@@ -638,7 +638,7 @@ dependencies = [
 
 [[package]]
 name = "karlsruhe-garbage-calendar"
-version = "0.2.2"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "axum",
