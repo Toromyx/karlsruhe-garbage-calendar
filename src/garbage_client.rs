@@ -175,41 +175,35 @@ fn parse(html: &str) -> Result<WasteData> {
             continue;
         };
         let type_col_inner_html = type_col.inner_html();
-        match () {
-            _ if type_col_inner_html.contains(LABEL_RESIDUAL) => {
-                let Some(date_col) = row_element.select(&date_col_selector).next() else {
-                    break;
-                };
-                let date_col_inner_html = date_col.inner_html();
+        let date_col_inner_html_option = row_element
+            .select(&date_col_selector)
+            .next()
+            .map(|date_col| date_col.inner_html());
+        let bulky_waste_date_col_inner_html_option = row_element
+            .select(&bulky_waste_date_col_selector)
+            .next()
+            .map(|date_col| date_col.inner_html());
+        match (
+            date_col_inner_html_option,
+            bulky_waste_date_col_inner_html_option,
+        ) {
+            (Some(date_col_inner_html), _) if type_col_inner_html.contains(LABEL_RESIDUAL) => {
                 residual_waste_dates = find_dates(&date_col_inner_html);
             }
-            _ if type_col_inner_html.contains(LABEL_ORGANIC) => {
-                let Some(date_col) = row_element.select(&date_col_selector).next() else {
-                    break;
-                };
-                let date_col_inner_html = date_col.inner_html();
+            (Some(date_col_inner_html), _) if type_col_inner_html.contains(LABEL_ORGANIC) => {
                 organic_waste_dates = find_dates(&date_col_inner_html);
             }
-            _ if type_col_inner_html.contains(LABEL_RECYCLABLE) => {
-                let Some(date_col) = row_element.select(&date_col_selector).next() else {
-                    break;
-                };
-                let date_col_inner_html = date_col.inner_html();
+            (Some(date_col_inner_html), _) if type_col_inner_html.contains(LABEL_RECYCLABLE) => {
                 recyclable_waste_dates = find_dates(&date_col_inner_html);
             }
-            _ if type_col_inner_html.contains(LABEL_PAPER) => {
-                let Some(date_col) = row_element.select(&date_col_selector).next() else {
-                    break;
-                };
-                let date_col_inner_html = date_col.inner_html();
+            (Some(date_col_inner_html), _) if type_col_inner_html.contains(LABEL_PAPER) => {
                 paper_waste_dates = find_dates(&date_col_inner_html);
             }
-            _ if type_col_inner_html.contains(LABEL_BULKY) => {
-                let Some(date_col) = row_element.select(&bulky_waste_date_col_selector).next() else {
-                    break;
-                };
+            (_, Some(bulky_waste_date_col_inner_html))
+                if type_col_inner_html.contains(LABEL_BULKY) =>
+            {
                 bulky_waste_date = bulky_waste_date_regex
-                    .captures(&date_col.inner_html())
+                    .captures(&bulky_waste_date_col_inner_html)
                     .map(date_from_captures)
                     .flatten();
             }
