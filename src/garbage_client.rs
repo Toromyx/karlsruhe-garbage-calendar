@@ -69,33 +69,6 @@ fn get_calendar(
         .gregorian()
         .prodid(PROD_ID)
         .build();
-    let build_event = |dates: Vec<NaiveDate>, summary: &str| -> Option<IcalEvent> {
-        if dates.len() == 0 {
-            return None;
-        }
-        Some(
-            IcalEventBuilder::tzid(TIMEZONE)
-                .uid(uid(street, street_number, summary))
-                .changed(&changed)
-                .one_day(dates.get(0).unwrap().format(FORMAT).to_string())
-                .set(ical_property!("SUMMARY", summary))
-                .set(ical_property!(
-                    "RDATE",
-                    dates
-                        .into_iter()
-                        .map(|date| date.format(FORMAT).to_string())
-                        .collect::<Vec<String>>()
-                        .join(","),
-                    ical_param!("VALUE", "DATE")
-                ))
-                .set(ical_property!(
-                    "LOCATION",
-                    format!("{street} {street_number}, Karlsruhe")
-                ))
-                .set(ical_property!("DESCRIPTION", URL))
-                .build(),
-        )
-    };
     for (label, dates, exclude) in [
         (
             LABEL_RESIDUAL,
@@ -120,13 +93,47 @@ fn get_calendar(
         ),
     ] {
         if let (Some(event), false) = (
-            build_event(dates, label),
+            get_event(street, street_number, dates, label, &changed),
             exclude_waste_type.contains(exclude),
         ) {
             calendar.events.push(event);
         }
     }
     calendar
+}
+
+fn get_event(
+    street: &str,
+    street_number: &str,
+    dates: Vec<NaiveDate>,
+    summary: &str,
+    changed: &str,
+) -> Option<IcalEvent> {
+    if dates.len() == 0 {
+        return None;
+    }
+    Some(
+        IcalEventBuilder::tzid(TIMEZONE)
+            .uid(uid(street, street_number, summary))
+            .changed(changed)
+            .one_day(dates.get(0).unwrap().format(FORMAT).to_string())
+            .set(ical_property!("SUMMARY", summary))
+            .set(ical_property!(
+                "RDATE",
+                dates
+                    .into_iter()
+                    .map(|date| date.format(FORMAT).to_string())
+                    .collect::<Vec<String>>()
+                    .join(","),
+                ical_param!("VALUE", "DATE")
+            ))
+            .set(ical_property!(
+                "LOCATION",
+                format!("{street} {street_number}, Karlsruhe")
+            ))
+            .set(ical_property!("DESCRIPTION", URL))
+            .build(),
+    )
 }
 
 /// Parse the garbage HTML to usable waste data.
