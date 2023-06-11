@@ -25,7 +25,7 @@ static LABEL_PAPER: &str = "Papier";
 static LABEL_BULKY: &str = "Sperrmüllabholung";
 
 #[bitmask]
-pub enum ExcludeWasteType {
+pub enum WasteTypeBitmask {
     Residual,
     Organic,
     Recyclable,
@@ -37,11 +37,11 @@ pub enum ExcludeWasteType {
 pub async fn get(
     street: &str,
     street_number: &str,
-    exclude_waste_type: ExcludeWasteType,
+    excluded_waste_types: WasteTypeBitmask,
 ) -> Result<IcalCalendar> {
     let response = get_response(street, street_number).await?;
     let waste_data = parse(&response.text().await?)?;
-    let calendar = get_calendar(street, street_number, waste_data, exclude_waste_type);
+    let calendar = get_calendar(street, street_number, waste_data, excluded_waste_types);
     Ok(calendar)
 }
 
@@ -62,39 +62,39 @@ fn get_calendar(
     street: &str,
     street_number: &str,
     waste_data: WasteData,
-    exclude_waste_type: ExcludeWasteType,
+    excluded_waste_types: WasteTypeBitmask,
 ) -> IcalCalendar {
     let changed = chrono::Local::now().format("%Y%m%dT%H%M%S").to_string();
     let mut calendar = IcalCalendarBuilder::version("2.0")
         .gregorian()
         .prodid(PROD_ID)
         .build();
-    for (label, dates, exclude) in [
+    for (label, dates, waste_type_bitmask) in [
         (
             LABEL_RESIDUAL,
             waste_data.residual_waste,
-            ExcludeWasteType::Residual,
+            WasteTypeBitmask::Residual,
         ),
         (
             LABEL_ORGANIC,
             waste_data.organic_waste,
-            ExcludeWasteType::Organic,
+            WasteTypeBitmask::Organic,
         ),
         (
             LABEL_RECYCLABLE,
             waste_data.recyclable_waste,
-            ExcludeWasteType::Recyclable,
+            WasteTypeBitmask::Recyclable,
         ),
-        (LABEL_PAPER, waste_data.paper_waste, ExcludeWasteType::Paper),
+        (LABEL_PAPER, waste_data.paper_waste, WasteTypeBitmask::Paper),
         (
             LABEL_BULKY,
             waste_data.bulky_waste.into_iter().collect(),
-            ExcludeWasteType::Bulky,
+            WasteTypeBitmask::Bulky,
         ),
     ] {
         if let (Some(event), false) = (
             get_event(street, street_number, dates, label, &changed),
-            exclude_waste_type.contains(exclude),
+            excluded_waste_types.contains(waste_type_bitmask),
         ) {
             calendar.events.push(event);
         }
@@ -255,7 +255,7 @@ mod tests {
     use ical::generator::{IcalCalendar, IcalEvent};
 
     use crate::garbage_client::{
-        get, get_calendar, parse, ExcludeWasteType, WasteData, LABEL_BULKY, LABEL_ORGANIC,
+        get, get_calendar, parse, WasteData, WasteTypeBitmask, LABEL_BULKY, LABEL_ORGANIC,
         LABEL_RECYCLABLE, LABEL_RESIDUAL,
     };
 
@@ -290,7 +290,7 @@ mod tests {
     /// This is an online test!
     #[tokio::test]
     async fn test_get() {
-        let calendar = get("Schloßplatz", "1", ExcludeWasteType::none())
+        let calendar = get("Schloßplatz", "1", WasteTypeBitmask::none())
             .await
             .unwrap();
         assert!(calendar.events.len() > 0);
@@ -331,7 +331,7 @@ mod tests {
     #[test]
     fn test_get_calendar_all() {
         let waste_data = get_test_waste_data();
-        let calendar = get_calendar("street", "69", waste_data, ExcludeWasteType::none());
+        let calendar = get_calendar("street", "69", waste_data, WasteTypeBitmask::none());
         assert_eq!(calendar.events.len(), 5);
         let residual_dtstart = get_property_value_of_event(&calendar, "DTSTART", LABEL_RESIDUAL);
         assert_eq!(residual_dtstart, "20230616");
@@ -342,7 +342,7 @@ mod tests {
     #[test]
     fn test_get_calendar_exclusion() {
         let waste_data = get_test_waste_data();
-        let calendar = get_calendar("street", "69", waste_data, ExcludeWasteType::Bulky);
+        let calendar = get_calendar("street", "69", waste_data, WasteTypeBitmask::Bulky);
         assert_eq!(calendar.events.len(), 4);
         let bulky_found = find_event(&calendar, LABEL_BULKY).is_some();
         assert_eq!(bulky_found, false);
@@ -352,7 +352,7 @@ mod tests {
             "street",
             "69",
             waste_data,
-            ExcludeWasteType::Recyclable | ExcludeWasteType::Organic,
+            WasteTypeBitmask::Recyclable | WasteTypeBitmask::Organic,
         );
         assert_eq!(calendar.events.len(), 3);
         let recyclable_found = find_event(&calendar, LABEL_RECYCLABLE).is_some();

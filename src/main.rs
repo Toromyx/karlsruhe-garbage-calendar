@@ -17,7 +17,7 @@ use axum::{
 use ical::generator::Emitter;
 use serde::Deserialize;
 
-use crate::garbage_client::ExcludeWasteType;
+use crate::garbage_client::WasteTypeBitmask;
 
 #[tokio::main]
 async fn main() {
@@ -45,25 +45,25 @@ struct QueryParams {
     exclude_bulky: bool,
 }
 
-impl From<&QueryParams> for ExcludeWasteType {
+impl From<&QueryParams> for WasteTypeBitmask {
     fn from(value: &QueryParams) -> Self {
-        let mut exclude_waste_type = ExcludeWasteType::none();
+        let mut waste_type_bitmask = WasteTypeBitmask::none();
         if value.exclude_residual {
-            exclude_waste_type |= ExcludeWasteType::Residual;
+            waste_type_bitmask |= WasteTypeBitmask::Residual;
         }
         if value.exclude_organic {
-            exclude_waste_type |= ExcludeWasteType::Organic;
+            waste_type_bitmask |= WasteTypeBitmask::Organic;
         }
         if value.exclude_recyclable {
-            exclude_waste_type |= ExcludeWasteType::Recyclable;
+            waste_type_bitmask |= WasteTypeBitmask::Recyclable;
         }
         if value.exclude_paper {
-            exclude_waste_type |= ExcludeWasteType::Paper;
+            waste_type_bitmask |= WasteTypeBitmask::Paper;
         }
         if value.exclude_bulky {
-            exclude_waste_type |= ExcludeWasteType::Bulky;
+            waste_type_bitmask |= WasteTypeBitmask::Bulky;
         }
-        exclude_waste_type
+        waste_type_bitmask
     }
 }
 
@@ -76,7 +76,7 @@ async fn handler(
     let ical_calendar = garbage_client::get(
         &query_params.street,
         &query_params.street_number,
-        ExcludeWasteType::from(&query_params),
+        WasteTypeBitmask::from(&query_params),
     )
     .await
     .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
@@ -86,7 +86,7 @@ async fn handler(
 
 #[cfg(test)]
 mod tests {
-    use crate::{garbage_client::ExcludeWasteType, QueryParams};
+    use crate::{garbage_client::WasteTypeBitmask, QueryParams};
 
     #[test]
     fn test_from_query_params_for_exclude_waste_type() {
@@ -99,8 +99,8 @@ mod tests {
             exclude_paper: false,
             exclude_bulky: false,
         };
-        let exclude_from_query_params = ExcludeWasteType::from(&exclude_query_params);
-        assert_eq!(exclude_from_query_params, ExcludeWasteType::none());
+        let exclude_from_query_params = WasteTypeBitmask::from(&exclude_query_params);
+        assert_eq!(exclude_from_query_params, WasteTypeBitmask::none());
         let exclude_query_params = QueryParams {
             street: "".to_string(),
             street_number: "".to_string(),
@@ -110,8 +110,8 @@ mod tests {
             exclude_paper: false,
             exclude_bulky: false,
         };
-        let exclude_from_query_params = ExcludeWasteType::from(&exclude_query_params);
-        assert_eq!(exclude_from_query_params, ExcludeWasteType::Residual);
+        let exclude_from_query_params = WasteTypeBitmask::from(&exclude_query_params);
+        assert_eq!(exclude_from_query_params, WasteTypeBitmask::Residual);
         let exclude_query_params = QueryParams {
             street: "".to_string(),
             street_number: "".to_string(),
@@ -121,8 +121,8 @@ mod tests {
             exclude_paper: false,
             exclude_bulky: false,
         };
-        let exclude_from_query_params = ExcludeWasteType::from(&exclude_query_params);
-        assert_eq!(exclude_from_query_params, ExcludeWasteType::Organic);
+        let exclude_from_query_params = WasteTypeBitmask::from(&exclude_query_params);
+        assert_eq!(exclude_from_query_params, WasteTypeBitmask::Organic);
         let exclude_query_params = QueryParams {
             street: "".to_string(),
             street_number: "".to_string(),
@@ -132,12 +132,12 @@ mod tests {
             exclude_paper: true,
             exclude_bulky: true,
         };
-        let exclude_from_query_params = ExcludeWasteType::from(&exclude_query_params);
+        let exclude_from_query_params = WasteTypeBitmask::from(&exclude_query_params);
         assert_eq!(
             exclude_from_query_params,
-            ExcludeWasteType::Recyclable
-                .or(ExcludeWasteType::Paper)
-                .or(ExcludeWasteType::Bulky)
+            WasteTypeBitmask::Recyclable
+                .or(WasteTypeBitmask::Paper)
+                .or(WasteTypeBitmask::Bulky)
         );
     }
 }
