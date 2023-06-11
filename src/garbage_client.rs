@@ -96,35 +96,35 @@ fn get_calendar(
                 .build(),
         )
     };
-    if let (Some(event), false) = (
-        build_event(waste_data.residual_waste, LABEL_RESIDUAL),
-        exclude_waste_type.contains(ExcludeWasteType::Residual),
-    ) {
-        calendar.events.push(event);
-    }
-    if let (Some(event), false) = (
-        build_event(waste_data.organic_waste, LABEL_ORGANIC),
-        exclude_waste_type.contains(ExcludeWasteType::Organic),
-    ) {
-        calendar.events.push(event);
-    }
-    if let (Some(event), false) = (
-        build_event(waste_data.recyclable_waste, LABEL_RECYCLABLE),
-        exclude_waste_type.contains(ExcludeWasteType::Recyclable),
-    ) {
-        calendar.events.push(event);
-    }
-    if let (Some(event), false) = (
-        build_event(waste_data.paper_waste, LABEL_PAPER),
-        exclude_waste_type.contains(ExcludeWasteType::Paper),
-    ) {
-        calendar.events.push(event);
-    }
-    if let (Some(event), false) = (
-        build_event(waste_data.bulky_waste.into_iter().collect(), LABEL_BULKY),
-        exclude_waste_type.contains(ExcludeWasteType::Bulky),
-    ) {
-        calendar.events.push(event);
+    for (label, dates, exclude) in [
+        (
+            LABEL_RESIDUAL,
+            waste_data.residual_waste,
+            ExcludeWasteType::Residual,
+        ),
+        (
+            LABEL_ORGANIC,
+            waste_data.organic_waste,
+            ExcludeWasteType::Organic,
+        ),
+        (
+            LABEL_RECYCLABLE,
+            waste_data.recyclable_waste,
+            ExcludeWasteType::Recyclable,
+        ),
+        (LABEL_PAPER, waste_data.paper_waste, ExcludeWasteType::Paper),
+        (
+            LABEL_BULKY,
+            waste_data.bulky_waste.into_iter().collect(),
+            ExcludeWasteType::Bulky,
+        ),
+    ] {
+        if let (Some(event), false) = (
+            build_event(dates, label),
+            exclude_waste_type.contains(exclude),
+        ) {
+            calendar.events.push(event);
+        }
     }
     calendar
 }
