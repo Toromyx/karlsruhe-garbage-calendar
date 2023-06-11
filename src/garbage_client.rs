@@ -45,6 +45,7 @@ pub async fn get(
     Ok(calendar)
 }
 
+/// Get the HTML response from the official server.
 async fn get_response(street: &str, street_number: &str) -> Result<Response> {
     let client = reqwest::Client::new();
     let response = client
@@ -58,6 +59,7 @@ async fn get_response(street: &str, street_number: &str) -> Result<Response> {
     Ok(response)
 }
 
+/// Build the calendar from the waste data.
 fn get_calendar(
     street: &str,
     street_number: &str,
@@ -102,6 +104,7 @@ fn get_calendar(
     calendar
 }
 
+/// Build an event from a vector of dates.
 fn get_event(
     street: &str,
     street_number: &str,
