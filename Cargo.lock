@@ -753,7 +753,7 @@ dependencies = [
 
 [[package]]
 name = "kgc_cli"
-version = "2.0.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -763,7 +763,7 @@ dependencies = [
 
 [[package]]
 name = "kgc_core"
-version = "2.0.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "bitmask-enum",
@@ -777,7 +777,7 @@ dependencies = [
 
 [[package]]
 name = "kgc_server"
-version = "2.0.0"
+version = "1.0.0"
 dependencies = [
  "axum",
  "kgc_core",

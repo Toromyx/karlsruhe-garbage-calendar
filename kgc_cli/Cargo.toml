@@ -9,7 +9,7 @@ license = "MIT"
 kgc_core = { path = "../kgc_core" }
 
 [dependencies.anyhow]
-version = "^1.0"
+workspace = true
 
 [dependencies.clap]
 version = "^4.3"
