@@ -4,6 +4,8 @@ Take a look at <https://web6.karlsruhe.de/service/abfall/akal/akal.php>. Isn't i
 
 ## Usage
 
+### Server
+
 The server binds to the port `8008`.
 You can get your garbage collection date calendar with the path `/calendar?street=<your_street>&street_number=<your_street_number>`.
 
