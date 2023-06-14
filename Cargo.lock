@@ -752,18 +752,35 @@ dependencies = [
 ]
 
 [[package]]
-name = "karlsruhe-garbage-calendar"
-version = "1.2.2"
+name = "kgc_cli"
+version = "2.0.0"
 dependencies = [
  "anyhow",
- "axum",
+ "clap",
+ "kgc_core",
+ "tokio",
+]
+
+[[package]]
+name = "kgc_core"
+version = "2.0.0"
+dependencies = [
+ "anyhow",
  "bitmask-enum",
  "chrono",
- "clap",
  "ical",
  "regex",
  "reqwest",
  "scraper",
+ "tokio",
+]
+
+[[package]]
+name = "kgc_server"
+version = "2.0.0"
+dependencies = [
+ "axum",
+ "kgc_core",
  "serde",
  "tokio",
 ]

@@ -1,30 +1,11 @@
-//! This module implement the CLI part of the application.
-
 use std::{env::current_dir, fs::write};
 
 use anyhow::Result;
-use clap::{Args, Parser, Subcommand};
-use ical::generator::Emitter;
-
-use crate::{garbage_client, garbage_client::WasteTypeBitmask};
+use clap::Parser;
+use kgc_core::{garbage_client, garbage_client::WasteTypeBitmask, ical::generator::Emitter};
 
 #[derive(Debug, Parser)]
-#[command()]
 pub struct Arguments {
-    #[command(subcommand)]
-    pub command: Option<Command>,
-}
-
-#[derive(Debug, Subcommand)]
-pub enum Command {
-    Cli {
-        #[command(flatten)]
-        args: CliArgs,
-    },
-}
-
-#[derive(Debug, Args)]
-pub struct CliArgs {
     /// the street
     pub street: String,
     /// the street number
@@ -46,8 +27,8 @@ pub struct CliArgs {
     pub exclude_bulky: bool,
 }
 
-impl From<&CliArgs> for WasteTypeBitmask {
-    fn from(value: &CliArgs) -> Self {
+impl From<&Arguments> for WasteTypeBitmask {
+    fn from(value: &Arguments) -> Self {
         let mut waste_type_bitmask = WasteTypeBitmask::none();
         if value.exclude_residual {
             waste_type_bitmask |= WasteTypeBitmask::Residual;
@@ -68,18 +49,13 @@ impl From<&CliArgs> for WasteTypeBitmask {
     }
 }
 
-pub async fn run(command: Command) -> Result<()> {
-    match command {
-        Command::Cli { args: cli_args } => run_cli(cli_args).await?,
-    };
-    Ok(())
-}
-
-async fn run_cli(cli_args: CliArgs) -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
+    let args = Arguments::parse();
     let calendar = garbage_client::get(
-        &cli_args.street,
-        &cli_args.street_number,
-        WasteTypeBitmask::from(&cli_args),
+        &args.street,
+        &args.street_number,
+        WasteTypeBitmask::from(&args),
     )
     .await?;
     let mut path = current_dir()?;

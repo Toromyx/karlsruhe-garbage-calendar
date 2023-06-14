@@ -3,10 +3,8 @@ use axum::{
     http::{header::CONTENT_TYPE, StatusCode},
     response::{IntoResponse, Response},
 };
-use ical::generator::Emitter;
+use kgc_core::{garbage_client, garbage_client::WasteTypeBitmask, ical::generator::Emitter};
 use serde::Deserialize;
-
-use crate::{garbage_client, garbage_client::WasteTypeBitmask};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct QueryParams {
@@ -65,7 +63,9 @@ pub async fn handler(
 
 #[cfg(test)]
 mod tests {
-    use crate::{garbage_client::WasteTypeBitmask, handler::QueryParams};
+    use kgc_core::garbage_client::WasteTypeBitmask;
+
+    use crate::handler::QueryParams;
 
     #[test]
     fn test_from_query_params_for_exclude_waste_type() {
