@@ -1,3 +1,9 @@
+pub mod bulky;
+pub mod organic;
+pub mod paper;
+pub mod recyclable;
+pub mod residual;
+
 use axum::{
     extract::Query,
     http::{header::CONTENT_TYPE, StatusCode},
@@ -8,8 +14,20 @@ use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct QueryParams {
+    #[serde(flatten)]
+    street_query_params: StreetQueryParams,
+    #[serde(flatten)]
+    exclude_query_params: ExcludeQueryParams,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct StreetQueryParams {
     street: String,
     street_number: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ExcludeQueryParams {
     #[serde(default)]
     exclude_residual: bool,
     #[serde(default)]
@@ -22,8 +40,8 @@ pub struct QueryParams {
     exclude_bulky: bool,
 }
 
-impl From<&QueryParams> for WasteTypeBitmask {
-    fn from(value: &QueryParams) -> Self {
+impl From<&ExcludeQueryParams> for WasteTypeBitmask {
+    fn from(value: &ExcludeQueryParams) -> Self {
         let mut waste_type_bitmask = WasteTypeBitmask::none();
         if value.exclude_residual {
             waste_type_bitmask |= WasteTypeBitmask::Residual;
@@ -44,20 +62,32 @@ impl From<&QueryParams> for WasteTypeBitmask {
     }
 }
 
+pub async fn handle(
+    street_query_params: &StreetQueryParams,
+    excluded_waste_types: WasteTypeBitmask,
+) -> Result<Response, (StatusCode, String)> {
+    let ical_calendar = garbage_client::get(
+        &street_query_params.street,
+        &street_query_params.street_number,
+        excluded_waste_types,
+    )
+    .await
+    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+    let response = ([(CONTENT_TYPE, "text/calendar")], ical_calendar.generate()).into_response();
+    Ok(response)
+}
+
 /// Handle calendar requests.
 ///
 /// The `street` and `street_number` must be given in the query string.
 pub async fn handler(
     Query(query_params): Query<QueryParams>,
 ) -> Result<Response, (StatusCode, String)> {
-    let ical_calendar = garbage_client::get(
-        &query_params.street,
-        &query_params.street_number,
-        WasteTypeBitmask::from(&query_params),
+    let response = handle(
+        &query_params.street_query_params,
+        WasteTypeBitmask::from(&query_params.exclude_query_params),
     )
-    .await
-    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
-    let response = ([(CONTENT_TYPE, "text/calendar")], ical_calendar.generate()).into_response();
+    .await?;
     Ok(response)
 }
 
@@ -69,9 +99,7 @@ mod tests {
 
     #[test]
     fn test_from_query_params_for_exclude_waste_type() {
-        let exclude_query_params = QueryParams {
-            street: "".to_string(),
-            street_number: "".to_string(),
+        let exclude_query_params = ExcludeQueryParams {
             exclude_residual: false,
             exclude_organic: false,
             exclude_recyclable: false,
@@ -80,9 +108,7 @@ mod tests {
         };
         let exclude_from_query_params = WasteTypeBitmask::from(&exclude_query_params);
         assert_eq!(exclude_from_query_params, WasteTypeBitmask::none());
-        let exclude_query_params = QueryParams {
-            street: "".to_string(),
-            street_number: "".to_string(),
+        let exclude_query_params = ExcludeQueryParams {
             exclude_residual: true,
             exclude_organic: false,
             exclude_recyclable: false,
@@ -91,9 +117,7 @@ mod tests {
         };
         let exclude_from_query_params = WasteTypeBitmask::from(&exclude_query_params);
         assert_eq!(exclude_from_query_params, WasteTypeBitmask::Residual);
-        let exclude_query_params = QueryParams {
-            street: "".to_string(),
-            street_number: "".to_string(),
+        let exclude_query_params = ExcludeQueryParams {
             exclude_residual: false,
             exclude_organic: true,
             exclude_recyclable: false,
@@ -102,9 +126,7 @@ mod tests {
         };
         let exclude_from_query_params = WasteTypeBitmask::from(&exclude_query_params);
         assert_eq!(exclude_from_query_params, WasteTypeBitmask::Organic);
-        let exclude_query_params = QueryParams {
-            street: "".to_string(),
-            street_number: "".to_string(),
+        let exclude_query_params = ExcludeQueryParams {
             exclude_residual: false,
             exclude_organic: false,
             exclude_recyclable: true,
