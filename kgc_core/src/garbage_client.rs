@@ -14,7 +14,7 @@ use reqwest::Response;
 use scraper::{Html, Selector};
 
 static URL: &str = "https://web6.karlsruhe.de/service/abfall/akal/akal.php";
-static PROD_ID: &str = "-//Abfuhrkalender//karlsruhe.de";
+static PROD_ID: [&str; 2] = ["Abfuhrkalender", "karlsruhe.de"];
 static TIMEZONE: &str = "Europe/Berlin";
 static FORMAT: &str = "%Y%m%d";
 
@@ -67,9 +67,17 @@ fn get_calendar(
     excluded_waste_types: WasteTypeBitmask,
 ) -> IcalCalendar {
     let changed = chrono::Local::now().format("%Y%m%dT%H%M%S").to_string();
+    let prod_id_label = match excluded_waste_types {
+        WasteTypeBitmask::NotResidual => Some(String::from(LABEL_RESIDUAL)),
+        WasteTypeBitmask::NotOrganic => Some(String::from(LABEL_ORGANIC)),
+        WasteTypeBitmask::NotRecyclable => Some(String::from(LABEL_RECYCLABLE)),
+        WasteTypeBitmask::NotPaper => Some(String::from(LABEL_PAPER)),
+        WasteTypeBitmask::NotBulky => Some(String::from(LABEL_BULKY)),
+        _ => None,
+    };
     let mut calendar = IcalCalendarBuilder::version("2.0")
         .gregorian()
-        .prodid(PROD_ID)
+        .prodid(prod_id(prod_id_label))
         .build();
     for (label, dates, waste_type_bitmask) in [
         (
@@ -228,6 +236,15 @@ fn parse(html: &str) -> Result<WasteData> {
         bulky_waste: bulky_waste_date,
     };
     Ok(waste_data)
+}
+
+fn prod_id(label: Option<String>) -> String {
+    let mut strings: Vec<String> = Vec::from(PROD_ID).into_iter().map(String::from).collect();
+    if let Some(label) = label {
+        strings.splice(0..0, [label]);
+    }
+    strings.splice(0..0, [String::from("-")]);
+    strings.join("//")
 }
 
 /// Get a unique id for a specific waste collection type at a specific location.

@@ -11,3 +11,6 @@ version = "^1.0"
 [workspace.dependencies.tokio]
 version = "^1.28"
 features = ["full"]
+
+[patch.crates-io]
+bitmask-enum = { git = "https://github.com/Toromyx/rust-bitmask-enum.git", branch = "feature/#6" }
