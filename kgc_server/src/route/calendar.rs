@@ -65,7 +65,7 @@ pub async fn handler(
 mod tests {
     use kgc_core::garbage_client::WasteTypeBitmask;
 
-    use crate::handler::QueryParams;
+    use super::*;
 
     #[test]
     fn test_from_query_params_for_exclude_waste_type() {
