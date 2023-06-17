@@ -174,10 +174,10 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 [[package]]
 name = "bitmask-enum"
 version = "2.1.0"
-source = "git+https://github.com/Toromyx/rust-bitmask-enum.git?branch=feature/#6#ae7fbc24e7ce85472a82a31fd7c45b2fa691f238"
+source = "git+https://github.com/Toromyx/rust-bitmask-enum.git?branch=feature/#6#e65e262ae7208bb4901e07643ec8f1dee3339f30"
 dependencies = [
  "quote",
- "syn 1.0.109",
+ "syn 2.0.18",
 ]
 
 [[package]]
