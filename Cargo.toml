@@ -2,6 +2,7 @@
 members = [
     "kgc_core",
     "kgc_server",
+    "kgc_server/frontend",
     "kgc_cli",
 ]
 
