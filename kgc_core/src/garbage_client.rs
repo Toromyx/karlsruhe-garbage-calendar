@@ -24,7 +24,7 @@ static LABEL_RECYCLABLE: &str = "Wertstoff";
 static LABEL_PAPER: &str = "Papier";
 static LABEL_BULKY: &str = "Sperrmüllabholung";
 
-#[bitmask(inverted_flags)]
+#[bitmask(config = [inverted_flags])]
 pub enum WasteTypeBitmask {
     Residual,
     Organic,
@@ -68,11 +68,11 @@ fn get_calendar(
 ) -> IcalCalendar {
     let changed = chrono::Local::now().format("%Y%m%dT%H%M%S").to_string();
     let prod_id_label = match excluded_waste_types {
-        WasteTypeBitmask::ResidualInverted => Some(String::from(LABEL_RESIDUAL)),
-        WasteTypeBitmask::OrganicInverted => Some(String::from(LABEL_ORGANIC)),
-        WasteTypeBitmask::RecyclableInverted => Some(String::from(LABEL_RECYCLABLE)),
-        WasteTypeBitmask::PaperInverted => Some(String::from(LABEL_PAPER)),
-        WasteTypeBitmask::BulkyInverted => Some(String::from(LABEL_BULKY)),
+        WasteTypeBitmask::InvertedResidual => Some(String::from(LABEL_RESIDUAL)),
+        WasteTypeBitmask::InvertedOrganic => Some(String::from(LABEL_ORGANIC)),
+        WasteTypeBitmask::InvertedRecyclable => Some(String::from(LABEL_RECYCLABLE)),
+        WasteTypeBitmask::InvertedPaper => Some(String::from(LABEL_PAPER)),
+        WasteTypeBitmask::InvertedBulky => Some(String::from(LABEL_BULKY)),
         _ => None,
     };
     let mut calendar = IcalCalendarBuilder::version("2.0")
