@@ -143,6 +143,7 @@ fn get_event(
                 format!("{street} {street_number}, Karlsruhe")
             ))
             .set(ical_property!("DESCRIPTION", URL))
+            .set(ical_property!("TRANSP", "TRANSPARENT"))
             .build(),
     )
 }
