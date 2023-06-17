@@ -16,18 +16,6 @@ use serde::Deserialize;
 pub struct QueryParams {
     #[serde(flatten)]
     street_query_params: StreetQueryParams,
-    #[serde(flatten)]
-    exclude_query_params: ExcludeQueryParams,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct StreetQueryParams {
-    street: String,
-    street_number: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ExcludeQueryParams {
     #[serde(default)]
     exclude_residual: bool,
     #[serde(default)]
@@ -40,8 +28,14 @@ pub struct ExcludeQueryParams {
     exclude_bulky: bool,
 }
 
-impl From<&ExcludeQueryParams> for WasteTypeBitmask {
-    fn from(value: &ExcludeQueryParams) -> Self {
+#[derive(Debug, Clone, Deserialize)]
+pub struct StreetQueryParams {
+    street: String,
+    street_number: String,
+}
+
+impl From<&QueryParams> for WasteTypeBitmask {
+    fn from(value: &QueryParams) -> Self {
         let mut waste_type_bitmask = WasteTypeBitmask::none();
         if value.exclude_residual {
             waste_type_bitmask |= WasteTypeBitmask::Residual;
@@ -85,7 +79,7 @@ pub async fn handler(
 ) -> Result<Response, (StatusCode, String)> {
     let response = handle(
         &query_params.street_query_params,
-        WasteTypeBitmask::from(&query_params.exclude_query_params),
+        WasteTypeBitmask::from(&query_params),
     )
     .await?;
     Ok(response)
