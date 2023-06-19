@@ -93,7 +93,11 @@ mod tests {
 
     #[test]
     fn test_from_query_params_for_exclude_waste_type() {
-        let exclude_query_params = ExcludeQueryParams {
+        let exclude_query_params = QueryParams {
+            street_query_params: StreetQueryParams {
+                street: "".to_string(),
+                street_number: "".to_string(),
+            },
             exclude_residual: false,
             exclude_organic: false,
             exclude_recyclable: false,
@@ -102,7 +106,11 @@ mod tests {
         };
         let exclude_from_query_params = WasteTypeBitmask::from(&exclude_query_params);
         assert_eq!(exclude_from_query_params, WasteTypeBitmask::none());
-        let exclude_query_params = ExcludeQueryParams {
+        let exclude_query_params = QueryParams {
+            street_query_params: StreetQueryParams {
+                street: "".to_string(),
+                street_number: "".to_string(),
+            },
             exclude_residual: true,
             exclude_organic: false,
             exclude_recyclable: false,
@@ -111,7 +119,11 @@ mod tests {
         };
         let exclude_from_query_params = WasteTypeBitmask::from(&exclude_query_params);
         assert_eq!(exclude_from_query_params, WasteTypeBitmask::Residual);
-        let exclude_query_params = ExcludeQueryParams {
+        let exclude_query_params = QueryParams {
+            street_query_params: StreetQueryParams {
+                street: "".to_string(),
+                street_number: "".to_string(),
+            },
             exclude_residual: false,
             exclude_organic: true,
             exclude_recyclable: false,
@@ -120,7 +132,11 @@ mod tests {
         };
         let exclude_from_query_params = WasteTypeBitmask::from(&exclude_query_params);
         assert_eq!(exclude_from_query_params, WasteTypeBitmask::Organic);
-        let exclude_query_params = ExcludeQueryParams {
+        let exclude_query_params = QueryParams {
+            street_query_params: StreetQueryParams {
+                street: "".to_string(),
+                street_number: "".to_string(),
+            },
             exclude_residual: false,
             exclude_organic: false,
             exclude_recyclable: true,
