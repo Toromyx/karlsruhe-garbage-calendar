@@ -3,7 +3,6 @@
 use std::{
     collections::HashMap,
     io::{BufReader, Cursor},
-    num::ParseIntError,
 };
 
 use anyhow::Result;
@@ -124,7 +123,7 @@ fn get_event(
     summary: &str,
     changed: &str,
 ) -> Option<IcalEvent> {
-    if dates.len() == 0 {
+    if dates.is_empty() {
         return None;
     }
     Some(
@@ -161,8 +160,7 @@ impl GetIcalProperty for IcalEvent {
         self.properties
             .iter()
             .find(|property| property.name == name)
-            .map(|property| property.value.as_ref())
-            .flatten()
+            .and_then(|property| property.value.as_ref())
     }
 }
 
@@ -180,16 +178,13 @@ fn parse(ics: &str) -> Result<WasteData> {
             let summary_option = ical_event.get_ical_property_value("SUMMARY");
             let date_option = ical_event
                 .get_ical_property_value("DTSTART")
-                .map(|dt_start| {
-                    Ok(NaiveDate::from_ymd_opt(
-                        dt_start[0..4].parse()?,
-                        dt_start[4..6].parse()?,
-                        dt_start[6..8].parse()?,
-                    ))
-                })
-                .map(|result: Result<_, ParseIntError>| result.ok())
-                .flatten()
-                .flatten();
+                .and_then(|dt_start| {
+                    NaiveDate::from_ymd_opt(
+                        dt_start[0..4].parse().ok()?,
+                        dt_start[4..6].parse().ok()?,
+                        dt_start[6..8].parse().ok()?,
+                    )
+                });
             let (Some(summary), Some(date)) = (summary_option, date_option) else {
                 continue;
             };

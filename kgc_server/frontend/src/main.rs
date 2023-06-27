@@ -10,15 +10,15 @@ pub fn App() -> Html {
     let street_number = (*street_number_handle).clone();
 
     let exclude_residual_handle = use_state_eq(|| false);
-    let exclude_residual = (*exclude_residual_handle).clone();
+    let exclude_residual = *exclude_residual_handle;
     let exclude_organic_handle = use_state_eq(|| false);
-    let exclude_organic = (*exclude_organic_handle).clone();
+    let exclude_organic = *exclude_organic_handle;
     let exclude_recyclable_handle = use_state_eq(|| false);
-    let exclude_recyclable = (*exclude_recyclable_handle).clone();
+    let exclude_recyclable = *exclude_recyclable_handle;
     let exclude_paper_handle = use_state_eq(|| false);
-    let exclude_paper = (*exclude_paper_handle).clone();
+    let exclude_paper = *exclude_paper_handle;
     let exclude_bulky_handle = use_state_eq(|| false);
-    let exclude_bulky = (*exclude_bulky_handle).clone();
+    let exclude_bulky = *exclude_bulky_handle;
 
     let calendar_url_search_params = |street: &str, street_number: &str| -> UrlSearchParams {
         let url_search_params = UrlSearchParams::new().unwrap();
@@ -71,11 +71,11 @@ pub fn App() -> Html {
         (
             street.clone(),
             street_number.clone(),
-            exclude_residual.clone(),
-            exclude_organic.clone(),
-            exclude_recyclable.clone(),
-            exclude_paper.clone(),
-            exclude_bulky.clone(),
+            exclude_residual,
+            exclude_organic,
+            exclude_recyclable,
+            exclude_paper,
+            exclude_bulky,
         ),
     );
     let main_url = (*main_url_handle).clone();
@@ -189,7 +189,7 @@ pub fn App() -> Html {
                             oninput={on_input_exclude_residual}
                             name="exclude_residual"
                             type="checkbox"
-                            checked={exclude_residual.clone()}
+                            checked={exclude_residual}
                         />{"Residual"}</label
                     >
                 </div>
@@ -199,7 +199,7 @@ pub fn App() -> Html {
                             oninput={on_input_exclude_organic}
                             name="exclude_organic"
                             type="checkbox"
-                            checked={exclude_organic.clone()}
+                            checked={exclude_organic}
                         />{"Organic"}</label
                     >
                 </div>
@@ -209,7 +209,7 @@ pub fn App() -> Html {
                             oninput={on_input_exclude_recyclable}
                             name="exclude_recyclable"
                             type="checkbox"
-                            checked={exclude_recyclable.clone()}
+                            checked={exclude_recyclable}
                         />{"Recyclable"}</label
                     >
                 </div>
@@ -219,7 +219,7 @@ pub fn App() -> Html {
                             oninput={on_input_exclude_paper}
                             name="exclude_paper"
                             type="checkbox"
-                            checked={exclude_paper.clone()}
+                            checked={exclude_paper}
                         />{"Paper"}</label
                     >
                 </div>
@@ -229,7 +229,7 @@ pub fn App() -> Html {
                             oninput={on_input_exclude_bulky}
                             name="exclude_bulky"
                             type="checkbox"
-                            checked={exclude_bulky.clone()}
+                            checked={exclude_bulky}
                         />{"Bulky"}</label
                     >
                 </div>
