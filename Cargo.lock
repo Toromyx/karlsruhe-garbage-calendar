@@ -212,8 +212,9 @@ checksum = "630be753d4e58660abd17930c71b647fe46c27ea6b63cc59e1e3851406972e42"
 
 [[package]]
 name = "bitmask-enum"
-version = "2.1.0"
-source = "git+https://github.com/Lukas3674/rust-bitmask-enum.git?rev=21d0140f5d05f746508d8bb2a139606d67f295e5#21d0140f5d05f746508d8bb2a139606d67f295e5"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78d456f91b4c1fdebf2698214e599fec3d7f8b46e3140fb254a9ea88c970ab0a"
 dependencies = [
  "quote",
  "syn 2.0.22",

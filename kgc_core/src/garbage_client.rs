@@ -26,7 +26,8 @@ static LABEL_RECYCLABLE: &str = "Wertstoff";
 static LABEL_PAPER: &str = "Papier";
 static LABEL_BULKY: &str = "Sperrmüllabholung";
 
-#[bitmask(config = [inverted_flags])]
+#[bitmask]
+#[bitmask_config(inverted_flags)]
 pub enum WasteTypeBitmask {
     Residual,
     Organic,

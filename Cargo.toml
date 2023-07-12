@@ -12,6 +12,3 @@ version = "^1.0"
 [workspace.dependencies.tokio]
 version = "^1.28"
 features = ["full"]
-
-[patch.crates-io]
-bitmask-enum = { git = "https://github.com/Lukas3674/rust-bitmask-enum.git", rev = "21d0140f5d05f746508d8bb2a139606d67f295e5" }
