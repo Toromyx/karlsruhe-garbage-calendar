@@ -1,6 +1,6 @@
 # Karlsruhe Garbage Calendar
 
-Take a look at <https://web6.karlsruhe.de/service/abfall/akal/akal.php>. Isn't it nice to check this page every few weeks because of irregularities in the recurring collection dates? This repository tries to remedy that problem by providing an iCalendar server.
+Take a look at <https://web6.karlsruhe.de/service/abfall/akal/akal.php>. I developed this application before an iCalendar download was provided. Now this library still exists because the ics download does not seem to regard exceptions to the recurring rules.
 
 ## Usage
 
