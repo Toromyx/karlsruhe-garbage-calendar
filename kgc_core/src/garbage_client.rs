@@ -1,19 +1,17 @@
 //! This client fetches garbage and parses it into waste data.
 
-use std::{
-    collections::HashMap,
-    io::{BufReader, Cursor},
-};
+use std::collections::HashMap;
 
 use anyhow::Result;
 use bitmask_enum::bitmask;
 use chrono::NaiveDate;
 use ical::{
     generator::{IcalCalendar, IcalCalendarBuilder, IcalEvent, IcalEventBuilder, Property},
-    ical_param, ical_property, IcalParser,
+    ical_param, ical_property,
 };
-use regex::Regex;
+use regex::{Captures, Regex};
 use reqwest::Response;
+use scraper::{Html, Selector};
 
 static URL: &str = "https://web6.karlsruhe.de/service/abfall/akal/akal.php";
 static PROD_ID: [&str; 2] = ["Abfuhrkalender", "karlsruhe.de"];
@@ -48,7 +46,7 @@ pub async fn get(
     Ok(calendar)
 }
 
-/// Get the iCalendar response from the official server.
+/// Get the HTML response from the official server.
 async fn get_response(street: &str, street_number: &str) -> Result<Response> {
     let client = reqwest::Client::new();
     let response = client
@@ -56,7 +54,6 @@ async fn get_response(street: &str, street_number: &str) -> Result<Response> {
         .form(&HashMap::from([
             ("strasse_n", street),
             ("hausnr", street_number),
-            ("ical", "+iCalendar"),
         ]))
         .send()
         .await?;
@@ -152,58 +149,83 @@ fn get_event(
     )
 }
 
-trait GetIcalProperty {
-    fn get_ical_property_value(&self, name: &str) -> Option<&String>;
-}
-
-impl GetIcalProperty for IcalEvent {
-    fn get_ical_property_value(&self, name: &str) -> Option<&String> {
-        self.properties
-            .iter()
-            .find(|property| property.name == name)
-            .and_then(|property| property.value.as_ref())
-    }
-}
-
-/// Parse the official iCalendar file to extract the waste data.
-fn parse(ics: &str) -> Result<WasteData> {
-    let parser = IcalParser::new(BufReader::new(Cursor::new(ics)));
+/// Parse the garbage HTML to usable waste data.
+fn parse(html: &str) -> Result<WasteData> {
+    let dom = Html::parse_document(html);
+    let row_selector = Selector::parse(".row").unwrap();
+    let rows = dom.select(&row_selector);
     let mut residual_waste_dates: Vec<NaiveDate> = vec![];
     let mut organic_waste_dates: Vec<NaiveDate> = vec![];
     let mut recyclable_waste_dates: Vec<NaiveDate> = vec![];
     let mut paper_waste_dates: Vec<NaiveDate> = vec![];
-    let mut bulky_waste_dates: Vec<NaiveDate> = vec![];
-    for ical_calendar_result in parser {
-        let ical_calendar = ical_calendar_result?;
-        for ical_event in ical_calendar.events {
-            let summary_option = ical_event.get_ical_property_value("SUMMARY");
-            let date_option = ical_event
-                .get_ical_property_value("DTSTART")
-                .and_then(|dt_start| {
-                    NaiveDate::from_ymd_opt(
-                        dt_start[0..4].parse().ok()?,
-                        dt_start[4..6].parse().ok()?,
-                        dt_start[6..8].parse().ok()?,
-                    )
-                });
-            let (Some(summary), Some(date)) = (summary_option, date_option) else {
-                continue;
-            };
-            if summary.contains(LABEL_RESIDUAL) {
-                residual_waste_dates.push(date);
+    let mut bulky_waste_date: Option<NaiveDate> = None;
+    let type_col_selector = Selector::parse(".col_3-2").unwrap();
+    let date_col_selector = Selector::parse(".col_3-3").unwrap();
+    let bulky_waste_date_col_selector = Selector::parse(".col_4-3").unwrap();
+    let date_regex = Regex::new(
+        r"(?x)
+            >\s* # the ending of the previous tag
+            \w{2}\.\s # the day of the week in short notation with a dot and a space
+            den\s
+            (?P<day>\d{2}) # the day
+            \.
+            (?P<month>\d{2}) # the month
+            \.
+            (?P<year>\d{4}) # the year
+        ",
+    )
+    .unwrap();
+    let bulky_waste_date_regex =
+        Regex::new(r">\s*(?P<day>\d{2})\.(?P<month>\d{2})\.(?P<year>\d{4})").unwrap();
+    let date_from_captures = |captures: Captures| -> Option<NaiveDate> {
+        let day: u32 = captures["day"].parse().unwrap();
+        let month: u32 = captures["month"].parse().unwrap();
+        let year: i32 = captures["year"].parse().unwrap();
+        NaiveDate::from_ymd_opt(year, month, day)
+    };
+    let find_dates = |inner_html: &str| -> Vec<NaiveDate> {
+        date_regex
+            .captures_iter(inner_html)
+            .filter_map(date_from_captures)
+            .collect()
+    };
+    for row_element in rows {
+        let Some(type_col) = row_element.select(&type_col_selector).next() else {
+            continue;
+        };
+        let type_col_inner_html = type_col.inner_html();
+        let date_col_inner_html_option = row_element
+            .select(&date_col_selector)
+            .next()
+            .map(|date_col| date_col.inner_html());
+        let bulky_waste_date_col_inner_html_option = row_element
+            .select(&bulky_waste_date_col_selector)
+            .next()
+            .map(|date_col| date_col.inner_html());
+        match (
+            date_col_inner_html_option,
+            bulky_waste_date_col_inner_html_option,
+        ) {
+            (Some(date_col_inner_html), _) if type_col_inner_html.contains(LABEL_RESIDUAL) => {
+                residual_waste_dates = find_dates(&date_col_inner_html);
             }
-            if summary.contains(LABEL_ORGANIC) {
-                organic_waste_dates.push(date);
+            (Some(date_col_inner_html), _) if type_col_inner_html.contains(LABEL_ORGANIC) => {
+                organic_waste_dates = find_dates(&date_col_inner_html);
             }
-            if summary.contains(LABEL_RECYCLABLE) {
-                recyclable_waste_dates.push(date);
+            (Some(date_col_inner_html), _) if type_col_inner_html.contains(LABEL_RECYCLABLE) => {
+                recyclable_waste_dates = find_dates(&date_col_inner_html);
             }
-            if summary.contains(LABEL_PAPER) {
-                paper_waste_dates.push(date);
+            (Some(date_col_inner_html), _) if type_col_inner_html.contains(LABEL_PAPER) => {
+                paper_waste_dates = find_dates(&date_col_inner_html);
             }
-            if summary.contains(LABEL_BULKY) {
-                bulky_waste_dates.push(date);
+            (_, Some(bulky_waste_date_col_inner_html))
+                if type_col_inner_html.contains(LABEL_BULKY) =>
+            {
+                bulky_waste_date = bulky_waste_date_regex
+                    .captures(&bulky_waste_date_col_inner_html)
+                    .and_then(date_from_captures);
             }
+            _ => continue,
         }
     }
     let waste_data = WasteData {
@@ -211,7 +233,7 @@ fn parse(ics: &str) -> Result<WasteData> {
         organic_waste: organic_waste_dates,
         recyclable_waste: recyclable_waste_dates,
         paper_waste: paper_waste_dates,
-        bulky_waste: bulky_waste_dates,
+        bulky_waste: bulky_waste_date,
     };
     Ok(waste_data)
 }
@@ -244,13 +266,11 @@ struct WasteData {
     pub organic_waste: Vec<NaiveDate>,
     pub recyclable_waste: Vec<NaiveDate>,
     pub paper_waste: Vec<NaiveDate>,
-    pub bulky_waste: Vec<NaiveDate>,
+    pub bulky_waste: Option<NaiveDate>,
 }
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use chrono::NaiveDate;
     use ical::generator::{IcalCalendar, IcalEvent};
 
@@ -262,75 +282,26 @@ mod tests {
     fn get_test_waste_data() -> WasteData {
         WasteData {
             residual_waste: vec![
-                NaiveDate::from_str("2023-06-30").unwrap(),
-                NaiveDate::from_str("2023-07-14").unwrap(),
-                NaiveDate::from_str("2023-07-28").unwrap(),
-                NaiveDate::from_str("2023-08-11").unwrap(),
-                NaiveDate::from_str("2023-08-25").unwrap(),
-                NaiveDate::from_str("2023-09-08").unwrap(),
-                NaiveDate::from_str("2023-09-22").unwrap(),
-                NaiveDate::from_str("2023-10-06").unwrap(),
-                NaiveDate::from_str("2023-10-20").unwrap(),
-                NaiveDate::from_str("2023-11-03").unwrap(),
-                NaiveDate::from_str("2023-11-17").unwrap(),
-                NaiveDate::from_str("2023-12-01").unwrap(),
-                NaiveDate::from_str("2023-12-15").unwrap(),
-                NaiveDate::from_str("2023-12-30").unwrap(),
+                NaiveDate::from_ymd_opt(2023, 6, 16).unwrap(),
+                NaiveDate::from_ymd_opt(2023, 6, 29).unwrap(),
+                NaiveDate::from_ymd_opt(2023, 7, 14).unwrap(),
             ],
             organic_waste: vec![
-                NaiveDate::from_str("2023-06-28").unwrap(),
-                NaiveDate::from_str("2023-07-05").unwrap(),
-                NaiveDate::from_str("2023-07-12").unwrap(),
-                NaiveDate::from_str("2023-07-19").unwrap(),
-                NaiveDate::from_str("2023-07-26").unwrap(),
-                NaiveDate::from_str("2023-08-02").unwrap(),
-                NaiveDate::from_str("2023-08-09").unwrap(),
-                NaiveDate::from_str("2023-08-16").unwrap(),
-                NaiveDate::from_str("2023-08-23").unwrap(),
-                NaiveDate::from_str("2023-08-30").unwrap(),
-                NaiveDate::from_str("2023-09-06").unwrap(),
-                NaiveDate::from_str("2023-09-13").unwrap(),
-                NaiveDate::from_str("2023-09-20").unwrap(),
-                NaiveDate::from_str("2023-09-27").unwrap(),
-                NaiveDate::from_str("2023-10-05").unwrap(),
-                NaiveDate::from_str("2023-10-11").unwrap(),
-                NaiveDate::from_str("2023-10-18").unwrap(),
-                NaiveDate::from_str("2023-10-25").unwrap(),
-                NaiveDate::from_str("2023-11-02").unwrap(),
-                NaiveDate::from_str("2023-11-08").unwrap(),
-                NaiveDate::from_str("2023-11-15").unwrap(),
-                NaiveDate::from_str("2023-11-22").unwrap(),
-                NaiveDate::from_str("2023-11-29").unwrap(),
-                NaiveDate::from_str("2023-12-06").unwrap(),
-                NaiveDate::from_str("2023-12-13").unwrap(),
-                NaiveDate::from_str("2023-12-20").unwrap(),
-                NaiveDate::from_str("2023-12-29").unwrap(),
+                NaiveDate::from_ymd_opt(2023, 6, 7).unwrap(),
+                NaiveDate::from_ymd_opt(2023, 6, 14).unwrap(),
+                NaiveDate::from_ymd_opt(2023, 6, 21).unwrap(),
             ],
             recyclable_waste: vec![
-                NaiveDate::from_str("2023-07-06").unwrap(),
-                NaiveDate::from_str("2023-07-20").unwrap(),
-                NaiveDate::from_str("2023-08-03").unwrap(),
-                NaiveDate::from_str("2023-08-17").unwrap(),
-                NaiveDate::from_str("2023-08-31").unwrap(),
-                NaiveDate::from_str("2023-09-14").unwrap(),
-                NaiveDate::from_str("2023-09-28").unwrap(),
-                NaiveDate::from_str("2023-10-12").unwrap(),
-                NaiveDate::from_str("2023-10-26").unwrap(),
-                NaiveDate::from_str("2023-11-09").unwrap(),
-                NaiveDate::from_str("2023-11-23").unwrap(),
-                NaiveDate::from_str("2023-12-07").unwrap(),
-                NaiveDate::from_str("2023-12-21").unwrap(),
+                NaiveDate::from_ymd_opt(2023, 6, 7).unwrap(),
+                NaiveDate::from_ymd_opt(2023, 6, 22).unwrap(),
+                NaiveDate::from_ymd_opt(2023, 7, 6).unwrap(),
             ],
             paper_waste: vec![
-                NaiveDate::from_str("2023-07-12").unwrap(),
-                NaiveDate::from_str("2023-08-09").unwrap(),
-                NaiveDate::from_str("2023-09-06").unwrap(),
-                NaiveDate::from_str("2023-10-04").unwrap(),
-                NaiveDate::from_str("2023-10-31").unwrap(),
-                NaiveDate::from_str("2023-11-29").unwrap(),
-                NaiveDate::from_str("2023-12-28").unwrap(),
+                NaiveDate::from_ymd_opt(2023, 6, 14).unwrap(),
+                NaiveDate::from_ymd_opt(2023, 7, 12).unwrap(),
+                NaiveDate::from_ymd_opt(2023, 8, 9).unwrap(),
             ],
-            bulky_waste: vec![NaiveDate::from_str("2023-07-12").unwrap()],
+            bulky_waste: Some(NaiveDate::from_ymd_opt(2023, 7, 12).unwrap()),
         }
     }
 
@@ -342,22 +313,18 @@ mod tests {
         let calendar = get("Schloßplatz", "1", WasteTypeBitmask::none())
             .await
             .unwrap();
-        assert!(calendar.events.len() > 0);
+        assert!(!calendar.events.is_empty());
     }
 
     fn find_event<'a>(calendar: &'a IcalCalendar, summary: &str) -> Option<&'a IcalEvent> {
         calendar.events.iter().find(|event| {
-            event
-                .properties
-                .iter()
-                .find(|property| {
-                    property.name == String::from("SUMMARY")
-                        && property
-                            .value
-                            .as_ref()
-                            .is_some_and(|value| value == summary)
-                })
-                .is_some()
+            event.properties.iter().any(|property| {
+                property.name == "SUMMARY"
+                    && property
+                        .value
+                        .as_ref()
+                        .is_some_and(|value| value == summary)
+            })
         })
     }
 
@@ -370,7 +337,7 @@ mod tests {
             .unwrap()
             .properties
             .iter()
-            .find(|property| property.name == String::from(property_name))
+            .find(|property| property.name == property_name)
             .unwrap()
             .value
             .as_ref()
@@ -383,9 +350,9 @@ mod tests {
         let calendar = get_calendar("street", "69", waste_data, WasteTypeBitmask::none());
         assert_eq!(calendar.events.len(), 5);
         let residual_dtstart = get_property_value_of_event(&calendar, "DTSTART", LABEL_RESIDUAL);
-        assert_eq!(residual_dtstart, "20230630");
+        assert_eq!(residual_dtstart, "20230616");
         let recyclable_rdate = get_property_value_of_event(&calendar, "RDATE", LABEL_RECYCLABLE);
-        assert_eq!(recyclable_rdate, "20230706,20230720,20230803,20230817,20230831,20230914,20230928,20231012,20231026,20231109,20231123,20231207,20231221");
+        assert_eq!(recyclable_rdate, "20230607,20230622,20230706");
     }
 
     #[test]
@@ -394,7 +361,7 @@ mod tests {
         let calendar = get_calendar("street", "69", waste_data, WasteTypeBitmask::Bulky);
         assert_eq!(calendar.events.len(), 4);
         let bulky_found = find_event(&calendar, LABEL_BULKY).is_some();
-        assert_eq!(bulky_found, false);
+        assert!(!bulky_found);
 
         let waste_data = get_test_waste_data();
         let calendar = get_calendar(
@@ -405,20 +372,19 @@ mod tests {
         );
         assert_eq!(calendar.events.len(), 3);
         let recyclable_found = find_event(&calendar, LABEL_RECYCLABLE).is_some();
-        assert_eq!(recyclable_found, false);
+        assert!(!recyclable_found);
         let organic_found = find_event(&calendar, LABEL_ORGANIC).is_some();
-        assert_eq!(organic_found, false);
+        assert!(!organic_found);
     }
 
-    /// Test whether the ics is parsed correctly.
+    /// Test whether the HTML is parsed correctly.
     ///
     /// This test is offline.
     #[test]
     fn test_parse() {
-        let ics = include_str!("garbage_client/tests/ical_calendar.ics");
-        let parsed = parse(ics).unwrap();
+        let html = include_str!("garbage_client/tests/response.html");
+        let parsed = parse(html).unwrap();
         let expected = get_test_waste_data();
-        println!("{:#?}", parsed);
         assert_eq!(parsed, expected)
     }
 }
