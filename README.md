@@ -25,4 +25,4 @@ The application can also be started with the subcommand `cli` to just get and wr
 
 ## Contributing
 
-Write a strongly worded letter to the city administration of Karlsruhe to provide this functionality themselves.
+Write a letter to the city administration of Karlsruhe to provide this functionality themselves.
